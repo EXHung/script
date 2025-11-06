@@ -1,0 +1,496 @@
+
+
+local Players    = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Teams      = game:GetService("Teams")
+
+local LP = Players.LocalPlayer
+local Char = LP.Character or LP.CharacterAdded:Wait()
+local HRP = Char:WaitForChild("HumanoidRootPart")
+
+-- === BIẾN MỚI ===
+local teamMode = false  -- Bật/tắt check team
+local hasTeams = #Teams:GetTeams() > 0
+
+-- === UI ===
+local screen = Instance.new("ScreenGui")
+screen.Name = "BringToolEXHung"
+screen.Parent = LP:WaitForChild("PlayerGui")
+screen.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 450)  -- Tăng chiều cao
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 2
+frame.BorderColor3 = Color3.fromRGB(100, 100, 100)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screen
+
+-- Title Rainbow
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 35)
+title.Text = "Bring Tool By EXHung"
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.Parent = frame
+
+task.spawn(function()
+    local hue = 0
+    while task.wait(0.05) do
+        if not title.Parent then break end
+        hue = (hue + 1) % 360
+        title.TextColor3 = Color3.fromHSV(hue / 360, 1, 1)
+    end
+end)
+
+-- TextBox
+local tb = Instance.new("TextBox")
+tb.Size = UDim2.new(0.6, 0, 0, 30)
+tb.Position = UDim2.new(0.05, 0, 0.11, 0)
+tb.PlaceholderText = "Tìm: a, ab..."
+tb.BackgroundColor3 = Color3.fromRGB(50,50,50)
+tb.TextColor3 = Color3.new(1,1,1)
+tb.ClearTextOnFocus = false
+tb.Parent = frame
+
+-- Add Button
+local addBtn = Instance.new("TextButton")
+addBtn.Size = UDim2.new(0.3, 0, 0, 30)
+addBtn.Position = UDim2.new(0.67, 0, 0.11, 0)
+addBtn.Text = "Add (0)"
+addBtn.BackgroundColor3 = Color3.fromRGB(100,100,100)
+addBtn.TextColor3 = Color3.new(1,1,1)
+addBtn.Parent = frame
+
+-- Danh sách
+local listFrame = Instance.new("ScrollingFrame")
+listFrame.Size = UDim2.new(0.9, 0, 0, 80)
+listFrame.Position = UDim2.new(0.05, 0, 0.21, 0)
+listFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+listFrame.BorderSizePixel = 1
+listFrame.ScrollBarThickness = 6
+listFrame.Parent = frame
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Padding = UDim.new(0, 2)
+listLayout.Parent = listFrame
+
+-- SLIDER
+local sliderLabel = Instance.new("TextLabel")
+sliderLabel.Size = UDim2.new(0.9, 0, 0, 28)
+sliderLabel.Position = UDim2.new(0.05, 0, 0.40, 0)
+sliderLabel.Text = "Khoảng cách: 6 studs"
+sliderLabel.BackgroundTransparency = 1
+sliderLabel.TextColor3 = Color3.new(1,1,1)
+sliderLabel.Font = Enum.Font.GothamBold
+sliderLabel.TextSize = 16
+sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+sliderLabel.Parent = frame
+
+local sliderBack = Instance.new("Frame")
+sliderBack.Size = UDim2.new(0.9, 0, 0, 10)
+sliderBack.Position = UDim2.new(0.05, 0, 0.47, 0)
+sliderBack.BackgroundColor3 = Color3.fromRGB(60,60,60)
+sliderBack.Parent = frame
+
+local sliderFill = Instance.new("Frame")
+sliderFill.Size = UDim2.new(0.6, 0, 1, 0)
+sliderFill.BackgroundColor3 = Color3.fromRGB(60,180,60)
+sliderFill.Parent = sliderBack
+
+local sliderKnob = Instance.new("TextButton")
+sliderKnob.Size = UDim2.new(0, 20, 0, 20)
+sliderKnob.Position = UDim2.new(0.6, -10, 0, -5)
+sliderKnob.BackgroundColor3 = Color3.new(1,1,1)
+sliderKnob.Text = ""
+sliderKnob.Parent = sliderBack
+
+-- NÚT TEAM MODE (MỚI)
+local teamToggle = Instance.new("TextButton")
+teamToggle.Size = UDim2.new(0.85, 0, 0, 30)
+teamToggle.Position = UDim2.new(0.075, 0, 0.52, 0)
+teamToggle.Text = "Team Mode: OFF"
+teamToggle.BackgroundColor3 = Color3.fromRGB(70,70,70)
+teamToggle.TextColor3 = Color3.new(1,1,1)
+teamToggle.Parent = frame
+
+-- Nút chức năng (dịch chuyển xuống)
+local followToggle = Instance.new("TextButton")
+followToggle.Size = UDim2.new(0.85, 0, 0, 30)
+followToggle.Position = UDim2.new(0.075, 0, 0.59, 0)
+followToggle.Text = "Follow Mode: OFF"
+followToggle.BackgroundColor3 = Color3.fromRGB(70,70,70)
+followToggle.TextColor3 = Color3.new(1,1,1)
+followToggle.Parent = frame
+
+local bringOneBtn = Instance.new("TextButton")
+bringOneBtn.Size = UDim2.new(0.85, 0, 0, 30)
+bringOneBtn.Position = UDim2.new(0.075, 0, 0.66, 0)
+bringOneBtn.Text = "Bring Player: OFF"
+bringOneBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+bringOneBtn.TextColor3 = Color3.new(1,1,1)
+bringOneBtn.Parent = frame
+
+local bringAllBtn = Instance.new("TextButton")
+bringAllBtn.Size = UDim2.new(0.85, 0, 0, 30)
+bringAllBtn.Position = UDim2.new(0.075, 0, 0.73, 0)
+bringAllBtn.Text = "Bring All: OFF"
+bringAllBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+bringAllBtn.TextColor3 = Color3.new(1,1,1)
+bringAllBtn.Parent = frame
+
+local clearAllBtn = Instance.new("TextButton")
+clearAllBtn.Size = UDim2.new(0.85, 0, 0, 25)
+clearAllBtn.Position = UDim2.new(0.075, 0, 0.80, 0)
+clearAllBtn.Text = "Clear All Players"
+clearAllBtn.BackgroundColor3 = Color3.fromRGB(180,60,60)
+clearAllBtn.TextColor3 = Color3.new(1,1,1)
+clearAllBtn.Parent = frame
+
+local turnOffBtn = Instance.new("TextButton")
+turnOffBtn.Size = UDim2.new(0.85, 0, 0, 30)
+turnOffBtn.Position = UDim2.new(0.075, 0, 0.88, 0)
+turnOffBtn.Text = "Turn Off Script"
+turnOffBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+turnOffBtn.TextColor3 = Color3.new(1,1,1)
+turnOffBtn.Font = Enum.Font.GothamBold
+turnOffBtn.Parent = frame
+
+-- === BIẾN ===
+local bringOne = false
+local bringAll = false
+local followMode = false
+local lastMatches = {}
+local addedPlayers = {}
+local originalCFrames = {}
+local targetCFrames = {}
+local BRING_DISTANCE = 6
+local isRunning = true
+local renderConnection
+
+-- === HÀM CHECK TEAM (MỚI) ===
+local function getEnemyPlayers()
+    local myTeam = LP.Team
+    local enemies = {}
+    if not hasTeams or not teamMode or not myTeam then
+        for _, p in Players:GetPlayers() do
+            if p ~= LP then table.insert(enemies, p) end
+        end
+        return enemies
+    end
+
+    for _, p in Players:GetPlayers() do
+        if p ~= LP and p.Team ~= myTeam then
+            table.insert(enemies, p)
+        end
+    end
+    return enemies
+end
+
+-- === NOCLIP CHO BẢN THÂN ===
+local function setSelfNoClip(enable)
+    if not Char then return end
+    for _, part in Char:GetChildren() do
+        if part:IsA("BasePart") then
+            part.CanCollide = not enable
+        end
+    end
+end
+
+-- === NOCLIP CHO PLAYER ===
+local function setPlayerNoClip(player, enable)
+    if not player.Character then return end
+    for _, part in player.Character:GetChildren() do
+        if part:IsA("BasePart") then
+            part.CanCollide = not enable
+        end
+    end
+end
+
+-- === ĐỨNG DẬY ===
+local function forceStand(player)
+    local hum = player.Character and player.Character:FindFirstChild("Humanoid")
+    if hum then
+        hum.Sit = false
+        if hum.SeatPart then hum.SeatPart = nil end
+        hum:ChangeState(Enum.HumanoidStateType.Running)
+    end
+end
+
+-- === LƯU VỊ TRÍ GỐC ===
+local function saveOriginalCFrame(player)
+    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        originalCFrames[player] = hrp.CFrame
+    end
+end
+
+-- === KHÔI PHỤC ===
+local function restorePlayer(player)
+    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if hrp and originalCFrames[player] then
+        hrp.CFrame = originalCFrames[player]
+    end
+    originalCFrames[player] = nil
+    targetCFrames[player] = nil
+end
+
+-- === SLIDER ===
+local dragging = false
+sliderKnob.MouseButton1Down:Connect(function() dragging = true end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if dragging and isRunning then
+        local mouse = LP:GetMouse()
+        local relX = math.clamp((mouse.X - sliderBack.AbsolutePosition.X) / sliderBack.AbsoluteSize.X, 0, 1)
+        sliderKnob.Position = UDim2.new(relX, -10, 0, -5)
+        sliderFill.Size = UDim2.new(relX, 0, 1, 0)
+        BRING_DISTANCE = math.floor(relX * 10 + 0.5)
+        sliderLabel.Text = "Khoảng cách: " .. BRING_DISTANCE .. " studs"
+    end
+end)
+
+-- === TÌM PLAYER ===
+local function findPlayersByPrefix(prefix)
+    if prefix == "" then return {} end
+    local lower = string.lower(prefix)
+    local matches = {}
+    for _, p in Players:GetPlayers() do
+        if p ~= LP then
+            local name = string.lower(p.Name)
+            local display = p.DisplayName and string.lower(p.DisplayName) or ""
+            if string.find(name, "^" .. lower) or string.find(display, "^" .. lower) then
+                table.insert(matches, p)
+            end
+        end
+    end
+    return matches
+end
+
+-- === XÓA PLAYER KHỎI LIST ===
+local function removePlayer(player)
+    local i = table.find(addedPlayers, player)
+    if i then
+        table.remove(addedPlayers, i)
+        restorePlayer(player)
+        setPlayerNoClip(player, false)
+        for _, btn in listFrame:GetChildren() do
+            if btn:IsA("TextButton") and btn.Text == player.Name then
+                btn:Destroy()
+                break
+            end
+        end
+        listFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
+    end
+end
+
+-- === THÊM PLAYER + RESPAWN ===
+local function addPlayerToList(player)
+    if table.find(addedPlayers, player) then return end
+    table.insert(addedPlayers, player)
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 25)
+    btn.BackgroundColor3 = Color3.fromRGB(60,60,80)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Text = player.Name
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.Parent = listFrame
+
+    local del = Instance.new("TextButton")
+    del.Size = UDim2.new(0, 25, 1, 0)
+    del.Position = UDim2.new(1, -28, 0, 0)
+    del.Text = "X"
+    del.BackgroundColor3 = Color3.fromRGB(180,60,60)
+    del.TextColor3 = Color3.new(1,1,1)
+    del.Parent = btn
+
+    del.MouseButton1Click:Connect(function()
+        removePlayer(player)
+    end)
+
+    listFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
+
+    -- Theo dõi respawn
+    local conn
+    conn = player.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if table.find(addedPlayers, player) and (bringOne or bringAll) then
+            saveOriginalCFrame(player)
+            if bringOne and not followMode then
+                targetCFrames[player] = nil
+            end
+        end
+    end)
+end
+
+-- === BRING LOOP (ĐÃ CẬP NHẬT TEAM) ===
+local function updateBring()
+    if not isRunning then return end
+    local myCFrame = HRP.CFrame * CFrame.new(0, 0, -BRING_DISTANCE)
+    local isBringing = bringOne or bringAll
+
+    -- NOCLIP CHO BẢN THÂN
+    if isBringing then
+        setSelfNoClip(true)
+    else
+        setSelfNoClip(false)
+    end
+
+    -- Bring All (Chỉ team địch nếu bật Team Mode)
+    if bringAll then
+        local targets = getEnemyPlayers()
+        for _, p in targets do
+            local char = p.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                forceStand(p)
+                setPlayerNoClip(p, true)
+                char.HumanoidRootPart.CFrame = myCFrame
+            end
+        end
+    end
+
+    -- Bring Added Players
+    if bringOne and #addedPlayers > 0 then
+        for _, p in addedPlayers do
+            local char = p.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local hrp = char.HumanoidRootPart
+                forceStand(p)
+                setPlayerNoClip(p, true)
+
+                if followMode then
+                    hrp.CFrame = myCFrame
+                else
+                    if not targetCFrames[p] then
+                        targetCFrames[p] = myCFrame
+                        hrp.CFrame = myCFrame
+                    else
+                        hrp.CFrame = targetCFrames[p]
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- === TẮT SCRIPT ===
+local function turnOffScript()
+    isRunning = false
+    renderConnection:Disconnect()
+    setSelfNoClip(false)
+    for _, p in addedPlayers do
+        setPlayerNoClip(p, false)
+        restorePlayer(p)
+    end
+    for _, p in Players:GetPlayers() do
+        if p ~= LP then setPlayerNoClip(p, false) end
+    end
+    screen:Destroy()
+end
+
+-- === SỰ KIỆN ===
+tb:GetPropertyChangedSignal("Text"):Connect(function()
+    lastMatches = findPlayersByPrefix(tb.Text:gsub("^%s*(.-)%s*$", "%1"))
+    local count = #lastMatches
+    addBtn.Text = "Add ("..count..")"
+    addBtn.BackgroundColor3 = count > 0 and Color3.fromRGB(60,180,60) or Color3.fromRGB(100,100,100)
+end)
+
+addBtn.MouseButton1Click:Connect(function()
+    if #lastMatches == 0 then return end
+    addPlayerToList(lastMatches[math.random(1, #lastMatches)])
+    tb.Text = ""
+end)
+
+-- TEAM MODE TOGGLE
+teamToggle.MouseButton1Click:Connect(function()
+    teamMode = not teamMode
+    teamToggle.Text = "Team Mode: "..(teamMode and "ON" or "OFF")
+    teamToggle.BackgroundColor3 = teamMode and Color3.fromRGB(60,180,60) or Color3.fromRGB(70,70,70)
+    if teamMode and not hasTeams then
+        teamToggle.Text = "Team Mode: NO TEAMS!"
+        teamToggle.BackgroundColor3 = Color3.fromRGB(180,60,60)
+        task.wait(1)
+        teamMode = false
+        teamToggle.Text = "Team Mode: OFF"
+        teamToggle.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    end
+end)
+
+followToggle.MouseButton1Click:Connect(function()
+    followMode = not followMode
+    followToggle.Text = "Follow Mode: "..(followMode and "ON" or "OFF")
+    followToggle.BackgroundColor3 = followMode and Color3.fromRGB(60,180,60) or Color3.fromRGB(70,70,70)
+end)
+
+bringOneBtn.MouseButton1Click:Connect(function()
+    if #addedPlayers == 0 then return end
+    bringOne = not bringOne
+    bringOneBtn.Text = bringOne and "Bringing "..#addedPlayers.." player(s)" or "Bring Player: OFF"
+    bringOneBtn.BackgroundColor3 = bringOne and Color3.fromRGB(60,180,60) or Color3.fromRGB(70,70,70)
+
+    if bringOne then
+        targetCFrames = {}
+        for _, p in addedPlayers do
+            if p.Character then saveOriginalCFrame(p) end
+        end
+    else
+        for _, p in addedPlayers do
+            setPlayerNoClip(p, false)
+            restorePlayer(p)
+        end
+    end
+end)
+
+bringAllBtn.MouseButton1Click:Connect(function()
+    bringAll = not bringAll
+    bringAllBtn.Text = "Bring All: "..(bringAll and "ON" or "OFF")
+    bringAllBtn.BackgroundColor3 = bringAll and Color3.fromRGB(60,180,60) or Color3.fromRGB(70,70,70)
+end)
+
+clearAllBtn.MouseButton1Click:Connect(function()
+    for _, p in addedPlayers do
+        setPlayerNoClip(p, false)
+        restorePlayer(p)
+    end
+    addedPlayers = {}
+    targetCFrames = {}
+    originalCFrames = {}
+    for _, child in listFrame:GetChildren() do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    bringOne = false
+    bringOneBtn.Text = "Bring Player: OFF"
+    bringOneBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+end)
+
+turnOffBtn.MouseButton1Click:Connect(turnOffScript)
+
+Players.PlayerRemoving:Connect(removePlayer)
+
+-- === KHỞI ĐỘNG ===
+renderConnection = RunService.RenderStepped:Connect(updateBring)
+listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    listFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
+end)
+
+-- Theo dõi respawn của bạn
+LP.CharacterAdded:Connect(function(newChar)
+    Char = newChar
+    HRP = newChar:WaitForChild("HumanoidRootPart")
+end)
+
+-- Cập nhật hasTeams khi team thay đổi
+LP:GetPropertyChangedSignal("Team"):Connect(function()
+    hasTeams = #Teams:GetTeams() > 0
+end)
